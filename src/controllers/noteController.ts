@@ -1,11 +1,11 @@
-import { RequestHandler, Response } from "express";
+import { RequestHandler, Response, Request } from "express";
 import Note from "../models/Note";
 import Category from "../models/Category";
 import mongoose from "mongoose";
-import { AuthInterface } from "../middleware/authMiddleware";
-
+import { zodToFieldErrors } from "../errors/zodErrors";
+import { createNoteDto } from "../dto/noteDto";
 export const getNotes: RequestHandler = async (
-  req: AuthInterface,
+  req: Request,
   res: Response
 ) => {
   try {
@@ -26,13 +26,17 @@ export const getNotes: RequestHandler = async (
   }
 };
 
-export const getNoteById: RequestHandler = async (
-  req: AuthInterface,
-  res: Response
+export const getNoteById: RequestHandler<{ id : string }> = async (
+  req: Request<{ id : string }>,
+  res: Response 
 ) => {
   try {
     if (!req.user) {
       res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+    if(!mongoose.Types.ObjectId.isValid(req.params.id)){
+      res.status(400).json({ message: "Invalid note ID" });
       return;
     }
     const note = await Note.findOne({
@@ -50,7 +54,7 @@ export const getNoteById: RequestHandler = async (
 };
 
 export const createCategory: RequestHandler = async (
-  req: AuthInterface,
+  req: Request,
   res: Response
 ) => {
   try {
@@ -73,7 +77,7 @@ export const createCategory: RequestHandler = async (
 };
 
 export const getAllCategories: RequestHandler = async (
-  req: AuthInterface,
+  req: Request,
   res: Response
 ) => {
   try {
@@ -92,8 +96,8 @@ export const getAllCategories: RequestHandler = async (
   }
 };
 
-export const getNoteByCategory: RequestHandler = async (
-  req: AuthInterface,
+export const getNoteByCategory: RequestHandler<{ categoryId : string }> = async (
+  req:  Request<{categoryId : string}>,
   res: Response
 ) => {
   try {
@@ -102,6 +106,10 @@ export const getNoteByCategory: RequestHandler = async (
       return;
     }
     const categoryId = req.params.categoryId;
+    if(!categoryId){
+      res.status(400).json({ message: "Category ID is required" });
+      return;
+    }
     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
       res.status(400).json({ message: "Invalid category ID" });
       return;
@@ -124,16 +132,22 @@ export const getNoteByCategory: RequestHandler = async (
 };
 
 export const createNote: RequestHandler = async (
-  req: AuthInterface,
+  req: Request,
   res: Response
 ) => {
   try {
-    const { title, content, category } = req.body;
-    if (!title || !content) {
-      res.status(400).json({ message: "Title and content are required" });
+    // const { title, content, category } = req.body;
+    // if (!title || !content) {
+    //   res.status(400).json({ message: "Title and content are required" });
+    //   return;
+    // }
+    const result = createNoteDto.safeParse(req.body);
+    if(!result.success){
+      const fieldErrors = zodToFieldErrors(result.error);
+      res.status(400).json(fieldErrors);
       return;
     }
-
+    const { title, content, category } = result.data;
     if (!req.user) {
       res.status(401).json({ message: "Unauthorized" });
       return;
@@ -166,11 +180,17 @@ export const createNote: RequestHandler = async (
 };
 
 export const updateNote: RequestHandler = async (
-  req: AuthInterface,
+  req: Request,
   res: Response
 ) => {
   try {
     const { title, content, categoryId } = req.body;
+    const noteId = req.params.id;
+
+    if(noteId){
+      res.status(400).json({ message: "Note ID is required" });
+      return;
+    }
 
     // Validate if all field is missing
     if (!title && !content && !categoryId) {
@@ -186,7 +206,7 @@ export const updateNote: RequestHandler = async (
     }
 
     // Validate Note ID
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(noteId)) {
       res.status(400).json({ message: "Invalid note ID" });
       return;
     }
@@ -228,7 +248,7 @@ export const updateNote: RequestHandler = async (
 
 // ✅ Delete Note - Only Owner Can Delete
 export const deleteNote: RequestHandler = async (
-  req: AuthInterface,
+  req: Request,
   res: Response
 ) => {
   try {

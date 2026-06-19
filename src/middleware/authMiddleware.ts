@@ -4,12 +4,12 @@ import { IAuthPayload } from "../types/auth";
 
 const SECRET_KEY = process.env.JWT_SECRET as string;
 
-export interface AuthInterface extends Request {
-  user?: IAuthPayload;
-}
+// export interface AuthInterface<P = ParamsDictionary> extends Request {
+//   user?: IAuthPayload;
+// }
 
 export const authenticateUser = (
-  req: AuthInterface,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
